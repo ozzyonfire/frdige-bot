@@ -47,8 +47,20 @@ export const edit_fridge_contents: OpenAI.ChatCompletionCreateParams.Function = 
 	}
 }
 
+export const empty_fridge: OpenAI.ChatCompletionCreateParams.Function = {
+	name: 'empty_fridge',
+	description: 'Removes all items in the fridge',
+	parameters: {
+		type: 'object',
+		properties: {},
+	}
+}
+
 export const tools = [
-	add_ingredient_to_fridge
+	add_ingredient_to_fridge,
+	get_fridge_contents,
+	edit_fridge_contents,
+	empty_fridge
 ].map(tool => ({
 	type: 'function',
 	function: tool

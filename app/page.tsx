@@ -1,6 +1,6 @@
 'use client';
 
-import { ChatRequest, FunctionCallHandler, nanoid } from "ai";
+import { ChatRequest, CreateMessage, FunctionCallHandler, Message, ToolCall, ToolCallHandler, nanoid } from "ai";
 import { useChat } from "ai/react";
 import { useMemo, useState } from "react";
 import { edit_fridge_contents, tools } from '@/lib/chat/bot';
@@ -8,6 +8,36 @@ import { useFridge } from "@/lib/utils";
 import Markdown from 'react-markdown';
 
 export default function Home() {
+
+  const getToolsResponse = async (toolCalls: ToolCall[]) => {
+    const messagesToSend: Message[] = [];
+    for (const toolCall of toolCalls) {
+      const { function: toolFn, id, type } = toolCall;
+      const functionToCall = tools[toolFn.name as keyof typeof tools];
+      if (functionToCall) {
+        const args = JSON.parse(toolFn.arguments || '{}');
+        const response = await functionToCall(args);
+        console.log(response);
+        messagesToSend.push({
+          id,
+          name: toolFn.name,
+          role: 'tool',
+          content: JSON.stringify(response),
+        });
+      }
+    }
+    return messagesToSend;
+  }
+
+  const toolCallHandler: ToolCallHandler = async (messages, toolCalls) => {
+    const messagesToSend = [...messages];
+    messagesToSend.concat(await getToolsResponse(toolCalls));
+    const response: ChatRequest = {
+      messages: messagesToSend,
+    };
+    return response;
+  }
+
   const functionCallHandler: FunctionCallHandler = async (messages, functionCall) => {
     console.log(messages, functionCall.name, functionCall.arguments);
     let response: any = {
@@ -35,15 +65,23 @@ export default function Home() {
     return functionResponse;
   }
 
-  const { messages, input, handleInputChange, handleSubmit, error, isLoading, stop, setMessages } = useChat({
+  const { messages, append, input, handleInputChange, handleSubmit, error, isLoading, stop, setMessages, reload } = useChat({
     api: '/chat',
     onError: (error) => {
       console.error(error);
     },
     experimental_onFunctionCall: functionCallHandler,
-    onFinish: (message) => {
-      console.log(message);
-    }
+    experimental_onToolCall: toolCallHandler,
+    // onFinish: async (message) => {
+    //   console.log(message);
+    //   if (message.tool_calls) {
+    //     const toolResponses = await getToolsResponse(message.tool_calls as ToolCall[]);
+    //     const newMessages = [...messages, message, ...toolResponses];
+    //     console.log('new', newMessages);
+    //     setMessages(newMessages);
+    //   }
+    // },
+    sendExtraMessageFields: false
   });
 
   const fridge = useFridge();
@@ -104,7 +142,16 @@ export default function Home() {
   return (
     <main className="flex h-screen p-12 bg-sky-700 gap-12">
       <div className='flex flex-col w-full md:w-2/3 lg:w-1/3 bg-white rounded-lg shadow-lg divide-y divide-gray-200 overflow-hidden'>
-        <h1 className='text-4xl font-bold text-center p-6 border-b border-gray-200'>My Fridge</h1>
+        <div className="flex flex-row gap-4 p-4 items-center">
+          <h1 className='text-4xl font-bold border-b border-gray-200'>My Fridge</h1>
+          <div className='flex-grow'></div>
+          <button
+            onClick={() => reload()}
+            className='bg-sky-700 hover:bg-sky-600 text-white rounded-lg p-2'
+          >
+            Clear all
+          </button>
+        </div>
         <div className='flex flex-col gap-2 p-4 h-full overflow-y-auto'>
           {fridgeMarkup}
         </div>
@@ -119,9 +166,9 @@ export default function Home() {
         </div>
         <form onSubmit={handleSubmit}>
           <div className='flex gap-4'>
-            <textarea
+            <input
               className='w-full border border-sky-700 rounded-lg p-2'
-              rows={1}
+              // rows={1}
               name="message"
               value={input}
               onChange={handleInputChange}

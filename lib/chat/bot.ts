@@ -63,8 +63,19 @@ export const edit_fridge_contents = async (args: { indredientIndex: number, quan
 	return { message: `Edited ${fridge_contents.items[indredientIndex].ingredient} to ${quantity}` };
 }
 
+export const empty_fridge = async () => {
+	localStorage.setItem('fridge', JSON.stringify({
+		items: []
+	}));
+	window.dispatchEvent(new Event('local-storage'));
+	return {
+		message: 'Emptied the fridge'
+	}
+}
+
 export const tools = {
 	add_ingredient_to_fridge,
 	get_fridge_contents,
-	edit_fridge_contents
+	edit_fridge_contents,
+	empty_fridge
 }

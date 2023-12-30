@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { add_ingredient_to_fridge, edit_fridge_contents, get_fridge_contents, tools } from './tools';
+import { add_ingredient_to_fridge, edit_fridge_contents, empty_fridge, get_fridge_contents, tools } from './tools';
 
 const openai = new OpenAI({
 	apiKey: process.env.OPENAI_API_KEY
@@ -31,7 +31,8 @@ export const chatCompletion = async (chatMessages: OpenAI.ChatCompletionMessageP
 		functions: [
 			add_ingredient_to_fridge,
 			get_fridge_contents,
-			edit_fridge_contents
+			edit_fridge_contents,
+			empty_fridge
 		],
 		max_tokens: 2000,
 		messages: messages,
