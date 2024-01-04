@@ -1,25 +1,27 @@
 'use client';
 
-import { ChatRequest, CreateMessage, FunctionCallHandler, Message, ToolCall, ToolCallHandler, nanoid } from "ai";
-import { useChat } from "ai/react";
-import { useMemo, useState } from "react";
 import { edit_fridge_contents, tools } from '@/lib/chat/bot';
 import { useFridge } from "@/lib/utils";
+import { ChatRequest, Message, ToolCall, ToolCallHandler, nanoid } from "ai";
+import { useChat } from "ai/react";
+import { useEffect, useMemo, useRef } from "react";
 import Markdown from 'react-markdown';
 
 export default function Home() {
+  const messagesRef = useRef<HTMLDivElement>(null);
 
   const getToolsResponse = async (toolCalls: ToolCall[]) => {
     const messagesToSend: Message[] = [];
+    console.log(toolCalls);
     for (const toolCall of toolCalls) {
       const { function: toolFn, id, type } = toolCall;
       const functionToCall = tools[toolFn.name as keyof typeof tools];
       if (functionToCall) {
         const args = JSON.parse(toolFn.arguments || '{}');
         const response = await functionToCall(args);
-        console.log(response);
         messagesToSend.push({
-          id,
+          id: nanoid(),
+          tool_call_id: id,
           name: toolFn.name,
           role: 'tool',
           content: JSON.stringify(response),
@@ -31,56 +33,23 @@ export default function Home() {
 
   const toolCallHandler: ToolCallHandler = async (messages, toolCalls) => {
     const messagesToSend = [...messages];
-    messagesToSend.concat(await getToolsResponse(toolCalls));
+    const newMessages = await getToolsResponse(toolCalls);
     const response: ChatRequest = {
-      messages: messagesToSend,
+      messages: messagesToSend.concat(newMessages),
     };
+    console.log(response);
     return response;
   }
 
-  const functionCallHandler: FunctionCallHandler = async (messages, functionCall) => {
-    console.log(messages, functionCall.name, functionCall.arguments);
-    let response: any = {
-      status: 'error',
-      message: 'Unknown function name'
-    }
-
-    const functionToCall = tools[functionCall.name as keyof typeof tools];
-    if (functionCall) {
-      const args = JSON.parse(functionCall.arguments || '{}');
-      response = await functionToCall(args);
-    }
-
-    const functionResponse: ChatRequest = {
-      messages: [
-        ...messages,
-        {
-          id: nanoid(),
-          name: functionCall.name,
-          role: 'function',
-          content: JSON.stringify(response),
-        }
-      ]
-    };
-    return functionResponse;
-  }
-
-  const { messages, append, input, handleInputChange, handleSubmit, error, isLoading, stop, setMessages, reload } = useChat({
+  const { messages, input, handleInputChange, handleSubmit, isLoading, reload } = useChat({
     api: '/chat',
+    body: {
+
+    },
     onError: (error) => {
       console.error(error);
     },
-    experimental_onFunctionCall: functionCallHandler,
     experimental_onToolCall: toolCallHandler,
-    // onFinish: async (message) => {
-    //   console.log(message);
-    //   if (message.tool_calls) {
-    //     const toolResponses = await getToolsResponse(message.tool_calls as ToolCall[]);
-    //     const newMessages = [...messages, message, ...toolResponses];
-    //     console.log('new', newMessages);
-    //     setMessages(newMessages);
-    //   }
-    // },
     sendExtraMessageFields: false
   });
 
@@ -116,6 +85,13 @@ export default function Home() {
     ))
   }, [messages]);
 
+  useEffect(() => {
+    // scroll to the bottom of the messages
+    if (messagesRef.current) {
+      messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
+    }
+  }, [messagesMarkup]);
+
   const fridgeMarkup = useMemo(() => {
     return fridge.items.map((item, i) => (
       <div key={i} className='flex justify-between items-center p-3 hover:bg-gray-50 transition-all duration-300 ease-in-out transform hover:scale-105'>
@@ -141,9 +117,9 @@ export default function Home() {
 
   return (
     <main className="flex h-screen p-12 bg-sky-700 gap-12">
-      <div className='flex flex-col w-full md:w-2/3 lg:w-1/3 bg-white rounded-lg shadow-lg divide-y divide-gray-200 overflow-hidden'>
+      <div className='flex flex-col w-full md:w-2/3 lg:w-1/3 bg-white rounded-lg shadow-lg overflow-hidden'>
         <div className="flex flex-row gap-4 p-4 items-center">
-          <h1 className='text-4xl font-bold border-b border-gray-200'>My Fridge</h1>
+          <h1 className='text-4xl font-bold'>My Fridge</h1>
           <div className='flex-grow'></div>
           <button
             onClick={() => reload()}
@@ -152,20 +128,20 @@ export default function Home() {
             Clear all
           </button>
         </div>
-        <div className='flex flex-col gap-2 p-4 h-full overflow-y-auto'>
+        <div className='flex flex-col gap-2 p-4 h-full overflow-y-auto divide-y divide-gray-200'>
           {fridgeMarkup}
         </div>
       </div>
-      <div className='flex flex-col w-2/3 bg-white rounded-lg p-4'>
-        <div className="flex flex-row gap-4 items-center">
+      <div className='flex flex-col w-2/3 bg-white rounded-lg'>
+        <div className="flex flex-row gap-4 items-center p-4">
           <h1 className='text-4xl font-bold'>Fridge Bot</h1>
           {isLoading && <span>Loading...</span>}
         </div>
-        <div id="messages" className='flex flex-col flex-grow rounded-lg border-sky-700 overflow-y-auto'>
+        <div id="messages" className='flex flex-col flex-grow rounded-lg pl-4 overflow-y-auto' ref={messagesRef}>
           {messagesMarkup}
         </div>
         <form onSubmit={handleSubmit}>
-          <div className='flex gap-4'>
+          <div className='flex gap-4 p-4'>
             <input
               className='w-full border border-sky-700 rounded-lg p-2'
               // rows={1}

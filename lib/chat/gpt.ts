@@ -12,6 +12,8 @@ const systemMessage: OpenAI.Chat.ChatCompletionSystemMessageParam = {
 	Your main goal is to suggest different types of meals, depending on what is available in the fridge. You should check the contents of the fridge and pantry before suggesting a meal. 
 
 	Before suggesting a meal, try to get the user's preferences on the style of cooking, difficulty, types of ingredients, and ethnicity.
+
+	Keep your chats short and concise, the exception is when you are outputting instructions for a meal.
 	
 	Render your outputs in Markdown formatting for presenting, images, links, lists, headers, etc.`
 }
@@ -26,16 +28,10 @@ export const chatCompletion = async (chatMessages: OpenAI.ChatCompletionMessageP
 	const response = await openai.chat.completions.create({
 		model: 'gpt-3.5-turbo-1106',
 		stream: true,
-		// tool_choice: 'auto',
-		// tools: tools,
-		functions: [
-			add_ingredient_to_fridge,
-			get_fridge_contents,
-			edit_fridge_contents,
-			empty_fridge
-		],
-		max_tokens: 2000,
+		tools: tools,
+		max_tokens: 4000,
 		messages: messages,
+		temperature: 0.7,
 	});
 
 	return response;
